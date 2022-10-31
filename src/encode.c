@@ -4,20 +4,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+
+#include <sys/mman.h>
 	
 #include "encode.h"
 #include "huff.h"
-
-#define BYTE_TO_BINARY_PATTERN "%c%c%c%c%c%c%c%c"
-#define BYTE_TO_BINARY(byte)\
-  (byte & 0x80 ? '1' : '0'),\
-  (byte & 0x40 ? '1' : '0'),\
-  (byte & 0x20 ? '1' : '0'),\
-  (byte & 0x10 ? '1' : '0'),\
-  (byte & 0x08 ? '1' : '0'),\
-  (byte & 0x04 ? '1' : '0'),\
-  (byte & 0x02 ? '1' : '0'),\
-  (byte & 0x01 ? '1' : '0') 
 
 #define BUFF_LEN 1048576
   
@@ -25,7 +16,12 @@ struct WRITE_BUFF {
 	byte 	*data;
 	size_t 	index;
 };
-  
+
+struct FILE_BUFF {
+	byte 	*data;
+	size_t	index;
+	size_t 	len;
+};
 
 
 int letter_compare(const void* pa, const void* pb){
@@ -39,7 +35,8 @@ int letter_compare(const void* pa, const void* pb){
 }
 
 /* pushes letters with a value to the top */
-/* BUG: doesnt work sometimes... see test.lz*/
+/* BUG:  doesnt work sometimes... */
+/* I dont even know if the bug is still here */
 static 
 uint32_t push_letters(struct Letterdata LETTERS[CHAR_MAX])
 {
@@ -54,18 +51,21 @@ uint32_t push_letters(struct Letterdata LETTERS[CHAR_MAX])
 }
 
 static
-uint32_t count_letters(FILE *fin, struct Letterdata LETTERS[CHAR_MAX], size_t len)
+uint32_t count_letters(struct FILE_BUFF fin, struct Letterdata LETTERS[CHAR_MAX])
 {
 	byte ch;
 	int i;
+	size_t len = fin.len;
+	
 	memset(LETTERS, 0, CHAR_MAX * sizeof(struct Letterdata));
 	
 	for( i = 0 ; i < CHAR_MAX ; i++ ){
 		LETTERS[i].ch = i;
 	}
 	ch = EOF;
+	
 	while( len-- ){
-		ch = fgetc(fin);
+		ch = fin.data[ fin.index++ ];
 		LETTERS[ch].freq += 1;
 	}
 	LETTERS[ch].freq = 1;/*adds eof*/
@@ -253,6 +253,7 @@ int encode(FILE *fin, FILE *fout)
 {
 	struct Letterdata LETTERS[CHAR_MAX];
 	struct WRITE_BUFF Buff;
+	struct FILE_BUFF fbuff;
 	byte c = 0, cindex = 0;
 
 	uint32_t codes[CHAR_MAX][2] = {0}; /*List of huffman codes [0] == code [1] == code length*/
@@ -272,12 +273,16 @@ int encode(FILE *fin, FILE *fout)
 	Buff.index = 0;
 	Buff.data = malloc(sizeof(byte) * BUFF_LEN);
 	
-	
 	fseek(fin, 0l, SEEK_END);
-	len = ftell(fin);
-	rewind(fin);
-	head = create_tree( count_letters(fin, LETTERS, len), LETTERS );
-	rewind(fin);
+	fbuff.len = len = ftell(fin);
+	
+	fbuff.data = mmap(NULL, fbuff.len, PROT_READ, MAP_SHARED, fileno(fin), 0);
+	fbuff.index = 0;
+	
+/* 	rewind(fin); */
+	head = create_tree( count_letters(fbuff, LETTERS), LETTERS );
+	fbuff.index = 0;
+/* 	rewind(fin); */
 	
 	fwrite(&len, sizeof(uint64_t), 1, fout);
 	
@@ -289,17 +294,17 @@ int encode(FILE *fin, FILE *fout)
 	
 	while( len-- > 0 )
 	{
-		cread = fgetc(fin);
+		cread = fbuff.data[ fbuff.index++ ];
 		
 		/*Moves bits into remaining space*/
 		c |= (codes[cread][0]>>24)>>cindex;
 		code_index = __CHAR_BIT__ - cindex;
 		
-		/*Check if theres any bits left to write
-		 This is basically a 'while ... else' loop*/
+		/*Write all bits into the buffer.
+		 Im not smart enough to debug this,
+		 but it finally works properly*/
 		if( codes[cread][1] > code_index ){
 			do{
-				/*c is full, so it gets written*/
 				Buff.data[Buff.index] = c;
 				Buff.index += 1;
 				if( Buff.index == BUFF_LEN ){
@@ -307,13 +312,9 @@ int encode(FILE *fin, FILE *fout)
 					Buff.index = 0;
 				}
 				
-				/*add the rest of the bits to c*/
 				c = (codes[cread][0]<<code_index)>>24;
 				
-				
-				/*add the amount of bits written to cindex*/
 				cindex = codes[cread][1] - code_index;
-				/*code_index adds 8. If theres less than 8 bits read itll still work out*/
 				code_index += 8;
 			}
 			while(codes[cread][1] > code_index);
@@ -335,6 +336,7 @@ int encode(FILE *fin, FILE *fout)
 	fwrite(Buff.data, sizeof(byte), Buff.index+1, fout);
 	
 	free(Buff.data);
+	munmap(fbuff.data, fbuff.len);
 	return 0;
 }
 

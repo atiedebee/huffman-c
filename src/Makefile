@@ -2,7 +2,7 @@ SRC = main.c encode.c decode.c
 OBJ = $(addprefix bin/, $(SRC:.c=.o))
 
 CC = gcc-11
-FLAGS = -ansi -pedantic-errors -Wpedantic -Wall -Wextra -O2 -flto
+FLAGS = -pedantic-errors -Wpedantic -Wall -Wextra -O2 -flto -Werror
 
 default: $(OBJ)
 	$(CC) $(OBJ) $(FLAGS)
