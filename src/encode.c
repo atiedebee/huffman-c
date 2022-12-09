@@ -275,14 +275,13 @@ int encode(FILE *fin, FILE *fout)
 	
 	fseek(fin, 0l, SEEK_END);
 	fbuff.len = len = ftell(fin);
+	rewind(fin);
 	
 	fbuff.data = mmap(NULL, fbuff.len, PROT_READ, MAP_SHARED, fileno(fin), 0);
 	fbuff.index = 0;
 	
-/* 	rewind(fin); */
 	head = create_tree( count_letters(fbuff, LETTERS), LETTERS );
 	fbuff.index = 0;
-/* 	rewind(fin); */
 	
 	fwrite(&len, sizeof(uint64_t), 1, fout);
 	
@@ -301,8 +300,7 @@ int encode(FILE *fin, FILE *fout)
 		code_index = __CHAR_BIT__ - cindex;
 		
 		/*Write all bits into the buffer.
-		 Im not smart enough to debug this,
-		 but it finally works properly*/
+		 This shit is magic for me now*/
 		if( codes[cread][1] > code_index ){
 			do{
 				Buff.data[Buff.index] = c;

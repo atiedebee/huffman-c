@@ -1,8 +1,10 @@
 /*kate: syntax ANSI C89;*/
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <ctype.h>
+#include <unistd.h>
 
 #include "huff.h"
 #include "encode.h"
@@ -67,46 +69,43 @@ void print_tree(struct Node *head, int32_t depth, int32_t isabove)
 
 enum Mode parse_args(int argc, char **argv, FILE **fin, FILE **fout)
 {
- 	char fin_name[256] = {0}, fout_name[256] = {0};
-	int32_t i, mode_changes = 0;
+	const char *optstring = "c:d:o:";
+ 	char *fin_name = NULL, *fout_name = NULL;
+	char opt;
 	enum Mode mode = NO_MODE;
-	
-	for( i = 1; i < argc; i++ )
-	{
-		if( strncmp(argv[i], "-c", 2) == 0)
+	while( (opt = getopt(argc, argv, optstring)) != -1 ){
+		switch(opt)
 		{
-			mode = COMPRESS_MODE;
-			mode_changes += 1;
-		}
-		else if( strncmp(argv[i], "-d", 2) == 0)
-		{
-			mode = DECOMPRESS_MODE;
-			mode_changes += 1;
-		}else if( strncmp(argv[i], "-o", 2) == 0)
-		{
-			if( i+1 >= argc ){
-				fprintf(stderr, "\nYou need to provide an output file\n");
-				return NO_MODE;
-			}
-			strncpy(fout_name, argv[i+1], 255);
-			i += 1;
-		}else if( strncmp(argv[i], "-p", 2) == 0)
-		{
-			do_print_tree = 1;
-		}else{
-			strncpy(fin_name, argv[i], 255);
+			case 'c':
+				if( mode != NO_MODE )
+					return NO_MODE;
+				
+				mode = COMPRESS_MODE;
+				fin_name = optarg;
+				break;
+			
+			case 'd':
+				if( mode != NO_MODE )
+					return NO_MODE;
+				
+				mode = DECOMPRESS_MODE;
+				fin_name = optarg;
+				break;
+			
+			case 'o':
+				if( fout_name != NULL ){
+					fprintf(stderr, "Improper usage, only one output file can be selected at a time\n");
+					return NO_MODE;
+				}
+				fout_name = optarg;
+				break;
 		}
 	}
 	
 	
-	if(fin_name[0] != 0)
+	if(fin_name != NULL)
 	{
-		if( mode == COMPRESS_MODE ){
-			*fin = fopen(fin_name, "r");
-		}else{
-			*fin = fopen(fin_name, "rb");
-		}
-		
+		*fin = fopen(fin_name, "rb");
 		if( *fin == NULL){
 			fprintf(stderr, "\nFailed opening %s\n", fin_name);
 			return NO_MODE;
@@ -115,26 +114,15 @@ enum Mode parse_args(int argc, char **argv, FILE **fin, FILE **fout)
 		fprintf(stderr, "\nNo input file specified.\n");
 		return NO_MODE;
 	}
-	
 	*fout = stdout;
-	if(fout_name[0] != 0)
+	
+	if(fout_name != NULL)
 	{
-		if( mode == COMPRESS_MODE ){
-			*fout = fopen(fout_name, "wb");
-		}
-		else{
-			*fout = fopen(fout_name, "w");
-		}
-		
+		*fout = fopen(fout_name, "wb");
 		if( *fout == NULL){
 			fprintf(stderr, "\nFailed opening '%s'.\n", fout_name);
 			return NO_MODE;
 		}
-	}
-	
-	if( mode_changes > 1 ){
-		fprintf(stderr, "\nYou can either encode OR deencode one file, not both!\n");
-		return NO_MODE;
 	}
 	return mode;
 }
