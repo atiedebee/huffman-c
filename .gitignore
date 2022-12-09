@@ -40,3 +40,4 @@
 # Test texts and profiler output
 *.txt
 *.huff
+*.gcda
