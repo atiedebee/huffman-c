@@ -1,27 +1,0 @@
-Flat profile:
-
-Each sample counts as 0.01 seconds.
-  %   cumulative   self              self     total           
- time   seconds   seconds    calls  Ts/call  Ts/call  name    
-100.04      3.08     3.08                             decode
-  0.00      3.08     0.00        1     0.00     0.00  read_tree
-
-			Call graph
-
-
-granularity: each sample hit covers 2 byte(s) for 0.32% of 3.08 seconds
-
-index % time    self  children    called     name
-                                                 <spontaneous>
-[1]    100.0    3.08    0.00                 decode [1]
-                0.00    0.00       1/1           read_tree [2]
------------------------------------------------
-                                  41             read_tree [2]
-                0.00    0.00       1/1           decode [1]
-[2]      0.0    0.00    0.00       1+41      read_tree [2]
-                                  41             read_tree [2]
------------------------------------------------
-
-Index by function name
-
-   [1] decode                  [2] read_tree
