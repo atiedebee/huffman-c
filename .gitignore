@@ -37,7 +37,5 @@
 *.x86_64
 *.hex
 
-# Test texts and profiler output
-*.txt
-*.huff
+
 *.gcda
