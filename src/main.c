@@ -69,7 +69,7 @@ void print_tree(struct Node *head, int32_t depth, int32_t isabove)
 
 enum Mode parse_args(int argc, char **argv, FILE **fin, FILE **fout)
 {
-	const char *optstring = "c:d:o:";
+	const char *optstring = "c:d:o:p";
  	char *fin_name = NULL, *fout_name = NULL;
 	char opt;
 	enum Mode mode = NO_MODE;
@@ -98,6 +98,9 @@ enum Mode parse_args(int argc, char **argv, FILE **fin, FILE **fout)
 					return NO_MODE;
 				}
 				fout_name = optarg;
+				break;
+			case 'p':
+				do_print_tree = 1;
 				break;
 		}
 	}

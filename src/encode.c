@@ -6,6 +6,7 @@
 #include <errno.h>
 
 #include <sys/mman.h>
+#include <endian.h>
 	
 #include "encode.h"
 #include "huff.h"
@@ -252,8 +253,8 @@ void write_tree(FILE *fout, byte *c, byte *cindex, const struct Node *head, stru
 int encode(FILE *fin, FILE *fout)
 {
 	struct Letterdata LETTERS[CHAR_MAX];
-	struct WRITE_BUFF Buff;
-	struct FILE_BUFF fbuff;
+	struct WRITE_BUFF out_buff;
+	struct FILE_BUFF in_buff;
 	byte c = 0, cindex = 0;
 
 	uint32_t codes[CHAR_MAX][2] = {0}; /*List of huffman codes [0] == code [1] == code length*/
@@ -270,30 +271,33 @@ int encode(FILE *fin, FILE *fout)
 		return -1;
 	}
 	
-	Buff.index = 0;
-	Buff.data = malloc(sizeof(byte) * BUFF_LEN);
+	out_buff.index = 0;
+	out_buff.data = malloc(sizeof(byte) * BUFF_LEN);
 	
 	fseek(fin, 0l, SEEK_END);
-	fbuff.len = len = ftell(fin);
+	in_buff.len = len = ftell(fin);
 	rewind(fin);
 	
-	fbuff.data = mmap(NULL, fbuff.len, PROT_READ, MAP_SHARED, fileno(fin), 0);
-	fbuff.index = 0;
+	in_buff.data = mmap(NULL, in_buff.len, PROT_READ, MAP_SHARED, fileno(fin), 0);
+	in_buff.index = 0;
 	
-	head = create_tree( count_letters(fbuff, LETTERS), LETTERS );
-	fbuff.index = 0;
-	
-	fwrite(&len, sizeof(uint64_t), 1, fout);
-	
+	head = create_tree( count_letters(in_buff, LETTERS), LETTERS );
+	in_buff.index = 0;
+
+	{
+		uint64_t write_len = htobe64(len);
+		fwrite(&write_len, sizeof(uint64_t), 1, fout);
+	}
+
 	init_codes(head, codes, temp_codes, 0);
-	write_tree(fout, &c, &cindex, head, &Buff);
+	write_tree(fout, &c, &cindex, head, &out_buff);
 	
 	if( do_print_tree ){ print_tree(head, 1, 0); }
 	free_tree(head);
 	
 	while( len-- > 0 )
 	{
-		cread = fbuff.data[ fbuff.index++ ];
+		cread = in_buff.data[ in_buff.index++ ];
 		
 		/*Moves bits into remaining space*/
 		c |= (codes[cread][0]>>24)>>cindex;
@@ -303,11 +307,11 @@ int encode(FILE *fin, FILE *fout)
 		 This shit is magic for me now*/
 		if( codes[cread][1] > code_index ){
 			do{
-				Buff.data[Buff.index] = c;
-				Buff.index += 1;
-				if( Buff.index == BUFF_LEN ){
-					fwrite(Buff.data, sizeof(byte), BUFF_LEN, fout);
-					Buff.index = 0;
+				out_buff.data[out_buff.index] = c;
+				out_buff.index += 1;
+				if( out_buff.index == BUFF_LEN ){
+					fwrite(out_buff.data, sizeof(byte), BUFF_LEN, fout);
+					out_buff.index = 0;
 				}
 				
 				c = (codes[cread][0]<<code_index)>>24;
@@ -319,22 +323,22 @@ int encode(FILE *fin, FILE *fout)
 		}
 		else{
 			cindex += codes[cread][1];
-			check_write(fout, &c, &cindex, &Buff);
+			check_write(fout, &c, &cindex, &out_buff);
 		}
 	}
 	
 	if( cindex > 0 ){
-		Buff.data[Buff.index] = c;
-		Buff.index += 1;
-		if( Buff.index == BUFF_LEN ){
-			fwrite(Buff.data, sizeof(byte), BUFF_LEN, fout);
-			Buff.index = 0;
+		out_buff.data[out_buff.index] = c;
+		out_buff.index += 1;
+		if( out_buff.index == BUFF_LEN ){
+			fwrite(out_buff.data, sizeof(byte), BUFF_LEN, fout);
+			out_buff.index = 0;
 		}
 	}
-	fwrite(Buff.data, sizeof(byte), Buff.index+1, fout);
+	fwrite(out_buff.data, sizeof(byte), out_buff.index+1, fout);
 	
-	free(Buff.data);
-	munmap(fbuff.data, fbuff.len);
+	free(out_buff.data);
+	munmap(in_buff.data, in_buff.len);
 	return 0;
 }
 

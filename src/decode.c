@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include <sys/mman.h>
+#include <endian.h>
 
 #include "huff.h"
 
@@ -63,11 +64,12 @@ int32_t decode(FILE *fin, FILE *fout)
 	uint64_t end;
 	
 	fread(&end, sizeof(uint64_t), 1, fin);
-	
+	end = be64toh(end);
+
 	fseek(fin, 0l, SEEK_END);
 	fbuff.len = ftell(fin);
 	fbuff.data = mmap(NULL, fbuff.len, PROT_READ, MAP_SHARED, fileno(fin), 0);
-	fbuff.index = 0;
+	fbuff.index = sizeof(uint64_t);
 	
 	head = read_tree(&fbuff, &c, &cindex);
 	parse_node = head;
