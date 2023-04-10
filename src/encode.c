@@ -257,7 +257,7 @@ int encode(FILE *fin, FILE *fout)
 	struct FILE_BUFF in_buff;
 	byte c = 0, cindex = 0;
 
-	uint32_t codes[CHAR_MAX][2] = {0}; /*List of huffman codes [0] == code [1] == code length*/
+	uint32_t codes[CHAR_MAX][2] = {0}; /*List of huffman codes [0] == huffman code, [1] == length*/
 	uint32_t temp_codes = 0;
 	
 	register byte 	  cread;		/*Byte thats being read*/
