@@ -8,6 +8,7 @@ default: $(OBJ)
 	$(CC) $(OBJ) $(FLAGS)
 
 bin/%.o:%.c
+	@mkdir -p $(dir $@)
 	$(CC) -c $^ -o $@ $(FLAGS)
 
 .PHONY: clean
